@@ -271,7 +271,7 @@ main(int argc,
 
         clock_gettime(CLOCK_REALTIME, &t0);
 
-        if (sock == -1) {
+        if (sock < 0) {
             sock = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
             if (sock < 0) {
                 fprintf(stderr, "%s: Error: %s: socket: %s\n",
@@ -338,12 +338,10 @@ main(int argc,
             if (got_sigint)
                 putchar('\r');
             printf("%s : %s : %6lu : %*.*f ms",
-                   timespec2str(&t0, NULL, 0, f_verbose > 1), argv[i], n,
-                   f_verbose > 1 ? 13 : 10,
-                   f_verbose > 1 ? 6 : 3,
-                   dt*1000.0);
+                   timespec2str(&t0, NULL, 0), argv[i], n,
+                   10, 3, dt*1000.0);
             if (f_verbose > 1)
-                printf(" : %.6f+%.6f ms", dtc*1000.0, dto*1000.0);
+                printf(" : %.3f+%.3f ms", dtc*1000.0, dto*1000.0);
 
             if (dt >= t_crit || dt >= t_warn || rc != RPC_SUCCESS) {
                 fputs(" : ", stdout);

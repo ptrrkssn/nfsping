@@ -53,8 +53,7 @@ timespec_diff(struct timespec *tp0,
 extern char *
 timespec2str(struct timespec *tp,
              char *buf,
-             size_t bufsize,
-             int precision);
+             size_t bufsize);
 
 
 int

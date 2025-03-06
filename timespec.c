@@ -82,8 +82,7 @@ timespec_diff(struct timespec *tp1,
 char *
 timespec2str(struct timespec *tp,
              char *buf,
-             size_t bufsize,
-             int f_verbose) {
+             size_t bufsize) {
     static char sbuf[256];
     struct tm t;
     int rc;
@@ -110,9 +109,7 @@ timespec2str(struct timespec *tp,
 
     bufsize -= rc;
 
-    rc = snprintf(buf+rc, bufsize,
-                  (f_verbose ? ".%06ld" : ".%03ld"),
-                  f_verbose ? tp->tv_nsec/1000 : tp->tv_nsec/1000000);
+    rc = snprintf(buf+rc, bufsize, ".%03ld", tp->tv_nsec/1000000);
     if (rc >= bufsize)
         return NULL;
 
