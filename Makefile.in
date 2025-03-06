@@ -45,13 +45,14 @@ DISTCHECKDIR =		/tmp/distcheck-$(PACKAGE)-$(VERSION)
 DISTDIR =		/tmp/build-$(PACKAGE)-$(VERSION)
 
 PROGRAMS =		nfsping
-OBJS =			nfsping.o
+OBJS =			nfsping.o timespec.o
 
 
 
 all: $(PROGRAMS)
 
-nfsping.o:	nfsping.c Makefile config.h
+nfsping.o:	nfsping.c Makefile config.h timespec.h
+timespec.o:	timespec.c timespec.h Makefile config.h
 
 nfsping: $(OBJS)
 	$(CC) $(LDFLAGS) -o nfsping $(OBJS) $(LIBS)

@@ -46,6 +46,9 @@
 #include <time.h>
 #include <netdb.h>
 
+#include "timespec.h"
+#include "config.h"
+
 #define NFS_PROGRAM 100003
 #define NFS_VERSION 4
 #define NFSPROC_NULL 0
@@ -74,107 +77,6 @@ sigint_handler(int sig) {
 }
 
 
-double
-timespec2double(struct timespec *tsp) {
-    double d;
-
-    d = tsp->tv_sec+(tsp->tv_nsec/1000000000.0);
-    return d;
-}
-
-double
-diff_timespec(struct timespec *t0,
-              struct timespec *t1) {
-    return (t0->tv_sec-t1->tv_sec) + (t0->tv_nsec-t1->tv_nsec)/1000000000.0;
-}
-
-
-char *
-timespec2str(struct timespec *ts,
-             char *buf,
-             size_t bufsize) {
-    static char sbuf[256];
-    struct tm t;
-    int rc;
-
-
-    if (!buf) {
-        if (bufsize) {
-            buf = malloc(bufsize);
-            if (!buf)
-                return NULL;
-        } else {
-            buf = sbuf;
-            bufsize = sizeof(sbuf);
-        }
-    }
-
-    tzset();
-    if (localtime_r(&(ts->tv_sec), &t) == NULL)
-        return NULL;
-
-    rc = strftime(buf, bufsize, "%F %T", &t);
-    if (rc <= 0)
-        return NULL;
-
-    bufsize -= rc;
-
-    rc = snprintf(buf+rc, bufsize,
-                  (f_verbose ? ".%09ld" : ".%03ld"),
-                  f_verbose ? ts->tv_nsec : ts->tv_nsec/1000000);
-    if (rc >= bufsize)
-        return NULL;
-
-    return buf;
-}
-
-
-int
-print_timespec(FILE *fp,
-	       struct timespec *ts) {
-    return fputs(timespec2str(ts, NULL, 0), fp);
-}
-
-
-int
-sscan_timespec(const char *s,
-	       struct timespec *tsp) {
-    char pfx[3] = "s";
-    double v;
-    int rc;
-
-
-    rc = sscanf(s, "%lf%2s", &v, pfx);
-    if (rc < 1)
-        return rc;
-
-    if (strcmp(pfx, "s") == 0) {
-        tsp->tv_sec = v;
-        v -= tsp->tv_sec;
-        tsp->tv_nsec = v * 1000000000.0;
-    } else if (strcmp(pfx, "ms") == 0) {
-        tsp->tv_sec = v / 1000.0;
-        v -= tsp->tv_sec * 1000.0;
-        tsp->tv_nsec = v * 1000000.0;
-    } else if (strcmp(pfx, "us") == 0 || strcmp(pfx, "μs") == 0) {
-        tsp->tv_sec = v / 1000000.0;
-        v -= tsp->tv_sec * 1000000.0;
-        tsp->tv_nsec = v * 1000.0;
-    } else if (strcmp(pfx, "ns") == 0) {
-        tsp->tv_sec = v / 1000000000.0;
-        v -= tsp->tv_sec * 1000000000.0;
-        tsp->tv_nsec = v;
-    } else if (strcmp(pfx, "m") == 0) {
-        tsp->tv_sec = v / 60.0;
-        v -= tsp->tv_sec*60;
-        tsp->tv_nsec = v * 1000000000 * 60;
-    } else
-        return -1;
-
-    return 1;
-}
-
-
 void
 usage(char *argv0) {
     printf("Usage:\n\t%s [<options>] <address> [<version>]\n", argv0);
@@ -191,6 +93,10 @@ usage(char *argv0) {
     puts("\t-W <time>  RTT warning time");
     puts("\t-C <time>  RTT critical time");
     puts("\t-T <uri>   Send timeseries data to <uri>");
+    puts("\nVersion:");
+    printf("\t%s (%s %s)\n", PACKAGE_VERSION, __DATE__, __TIME__);
+    puts("\nAuthor:");
+    puts("\tPeter Eriksson <pen@lysator.liu.se>");
 }
 
 
@@ -273,7 +179,7 @@ main(int argc,
                 break;
 
             case 'I':
-                if (sscan_timespec(argv[i]+j+1, &t_interval) != 1) {
+                if (str2timespec(argv[i]+j+1, &t_interval) != 1) {
                     fprintf(stderr, "%s: Error: %s: Invalid interval time\n",
                             argv[0], argv[i]+j+1);
                     exit(1);
@@ -311,6 +217,10 @@ main(int argc,
         fprintf(stderr, "%s: Error: Missing required <address> argument\n", argv[0]);
         exit(1);
     }
+
+    if (f_verbose && isatty(1))
+        printf("[%s - Copyright (C) 2025 Peter Eriksson <pen@lysator.liu.se>]\n",
+               PACKAGE_STRING);
 
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = f_family;
@@ -389,23 +299,19 @@ main(int argc,
         }
 
         clock_gettime(CLOCK_REALTIME, &t1);
-#if 0
-        rpcrc = nfsproc_null_4(&clnt_msg, cl);
-#else
         rc = clnt_call(cl, NFSPROC_NULL,
                        (xdrproc_t) xdr_void, (caddr_t) clnt_msg,
                        (xdrproc_t) xdr_void, (caddr_t) &clnt_res,
                        t_wait);
-#endif
         clock_gettime(CLOCK_REALTIME, &t2);
 
-        dtc = diff_timespec(&t1, &t0);
-        dto = diff_timespec(&t2, &t1);
-        dt  = diff_timespec(&t2, &t0);
+        dtc = timespec_diff(&t1, &t0);
+        dto = timespec_diff(&t2, &t1);
+        dt  = timespec_diff(&t2, &t0);
 
         if (rc != RPC_SUCCESS) {
-            fprintf(stderr, "%s: Error: %s [%.3f ms]: %s\n",
-                    argv[0], argv[i], dt, clnt_sperror(cl, "nfsproc_null"));
+            fprintf(stderr, "%s: Error: %s [%.3f+%.3f ms]: %s\n",
+                    argv[0], argv[i], dtc, dto, clnt_sperror(cl, "NFS(NULL)"));
             if (!f_ignore)
                 exit(1);
         }
@@ -431,11 +337,13 @@ main(int argc,
         if (f_verbose || dt >= t_warn || dt >= t_crit) {
             if (got_sigint)
                 putchar('\r');
-            printf("%s : %s : %6lu : %10.3f ms",
-                   timespec2str(&t0, NULL, 0), argv[i], n,
+            printf("%s : %s : %6lu : %*.*f ms",
+                   timespec2str(&t0, NULL, 0, f_verbose > 1), argv[i], n,
+                   f_verbose > 1 ? 13 : 10,
+                   f_verbose > 1 ? 6 : 3,
                    dt*1000.0);
             if (f_verbose > 1)
-                printf(" : %.3f+%.3f ms", dtc*1000.0, dto*1000.0);
+                printf(" : %.6f+%.6f ms", dtc*1000.0, dto*1000.0);
 
             if (dt >= t_crit || dt >= t_warn || rc != RPC_SUCCESS) {
                 fputs(" : ", stdout);
