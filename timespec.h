@@ -50,11 +50,14 @@ extern double
 timespec_diff(struct timespec *tp0,
               struct timespec *tp1);
 
+#define TS_RELATIVE 0
+#define TS_ABSOLUTE 1
+
 extern char *
 timespec2str(struct timespec *tp,
              char *buf,
-             size_t bufsize);
-
+             size_t bufsize,
+             unsigned int flags);
 
 int
 str2timespec(const char *s,

@@ -311,7 +311,8 @@ main(int argc,
 
         if (rc != RPC_SUCCESS) {
             fprintf(stderr, "%s: Error: %s [%.3f+%.3f ms]: %s\n",
-                    argv[0], argv[i], dtc, dto, clnt_sperror(cl, "NFS(NULL)"));
+                    argv[0], argv[i], dtc*1000, dto*1000, clnt_sperror(cl, "NFS(NULL)"));
+
             if (!f_ignore)
                 exit(1);
         }
@@ -338,7 +339,7 @@ main(int argc,
             if (got_sigint)
                 putchar('\r');
             printf("%s : %s : %6lu : %*.*f ms",
-                   timespec2str(&t0, NULL, 0), argv[i], n,
+                   timespec2str(&t0, NULL, 0, TS_ABSOLUTE), argv[i], n,
                    10, 3, dt*1000.0);
             if (f_verbose > 1)
                 printf(" : %.3f+%.3f ms", dtc*1000.0, dto*1000.0);

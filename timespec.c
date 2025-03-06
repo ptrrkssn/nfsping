@@ -79,10 +79,12 @@ timespec_diff(struct timespec *tp1,
 }
 
 
+
 char *
 timespec2str(struct timespec *tp,
              char *buf,
-             size_t bufsize) {
+             size_t bufsize,
+             unsigned int flags) {
     static char sbuf[256];
     struct tm t;
     int rc;
@@ -99,17 +101,42 @@ timespec2str(struct timespec *tp,
         }
     }
 
-    tzset();
-    if (localtime_r(&(tp->tv_sec), &t) == NULL)
-        return NULL;
+    if (flags & TS_ABSOLUTE) {
+        tzset();
+        if (localtime_r(&(tp->tv_sec), &t) == NULL)
+            return NULL;
 
-    rc = strftime(buf, bufsize, "%F %T", &t);
-    if (rc <= 0)
-        return NULL;
+        rc = strftime(buf, bufsize, "%F %T", &t);
+        if (rc <= 0)
+            return NULL;
+        bufsize -= rc;
 
-    bufsize -= rc;
+        rc = snprintf(buf+rc, bufsize, ".%03ld", tp->tv_nsec/1000000);
+    } else {
+        unsigned int h, m, s;
 
-    rc = snprintf(buf+rc, bufsize, ".%03ld", tp->tv_nsec/1000000);
+        h = tp->tv_sec / (60*60);
+        m = (tp->tv_sec-h*60*60)/60;
+        s = (tp->tv_sec-h*60*60-m*60);
+
+        if (h)
+            rc = snprintf(buf, bufsize, "%u h+%u m+%u.%.3lu s", h, m, s, tp->tv_nsec/1000000);
+        else if (m)
+            rc = snprintf(buf, bufsize, "%u m+%u.%.3lu s", m, s, tp->tv_nsec/1000000);
+        else if (s)
+            rc = snprintf(buf, bufsize, "%u.%.3lu s", s, tp->tv_nsec/1000000);
+        else {
+            double v = tp->tv_nsec/1000000.0;
+
+            if (v >= 1.0)
+                rc = snprintf(buf, bufsize, "%.3f ms", v);
+            else {
+                v = tp->tv_nsec / 1000.0;
+                rc = snprintf(buf, bufsize, "%.3f μs", v);
+            }
+        }
+    }
+
     if (rc >= bufsize)
         return NULL;
 
