@@ -218,7 +218,7 @@ main(int argc,
     struct addrinfo hints, *result, *rp;
     struct netbuf nbuf;
     CLIENT *cl = NULL;
-    int i, j, rc, *rpcrc;
+    int i, j, rc;
     void *clnt_msg = NULL;
     char clnt_res;
     int sock = -1;
